@@ -1,0 +1,143 @@
+let src;
+let simpleThresholdImg;
+let adaptiveThresholdImg;
+let otsuThresholdImg;
+
+function setup() {
+  createCanvas(1000, 900);
+  
+  src = loadImage('gray.png', () => {
+    // 이미지 로딩이 완료되면 Simple Thresholding, Adaptive Thresholding 및 THRES_OTSU 적용
+    simpleThresholdImg = createImage(src.width, src.height); // Simple Thresholding 결과 이미지 생성
+    adaptiveThresholdImg = createImage(src.width, src.height);//Adaptive Thresholding 결과 이미지 생성
+    otsuThresholdImg = createImage(src.width, src.height); // THRES_OTSU 결과 이미지 생성
+
+    src.loadPixels();
+    simpleThresholdImg.loadPixels();
+    adaptiveThresholdImg.loadPixels();
+    otsuThresholdImg.loadPixels();
+
+    // Simple Thresholding 적용
+    let simpleThreshold = 177;
+    for (let i = 0; i < src.pixels.length; i += 4) {
+      let r = src.pixels[i];
+      let g = src.pixels[i + 1];
+      let b = src.pixels[i + 2];
+      // threshold 적용
+      let gray = (r + g + b) / 3;
+      if (gray > simpleThreshold) {
+        simpleThresholdImg.pixels[i] = 200;
+        simpleThresholdImg.pixels[i + 1] = 200;
+        simpleThresholdImg.pixels[i + 2] = 200;
+      } else {
+        simpleThresholdImg.pixels[i] = 0;
+        simpleThresholdImg.pixels[i + 1] = 0;
+        simpleThresholdImg.pixels[i + 2] = 0;
+      }
+      simpleThresholdImg.pixels[i + 3] = 255;
+    }
+
+    // Adaptive Thresholding 적용
+    let blockSize = 15; // 블록 크기 조정
+    let C = 2; // C 값 조정
+    for (let x = 0; x < src.width; x++) {
+      for (let y = 0; y < src.height; y++) {
+        let sum = 0;
+        let count = 0;
+        for (let i = -blockSize; i < blockSize; i++) {
+          for (let j = -blockSize; j < blockSize; j++) {
+            let px = x + i;
+            let py = y + j;
+            if (px >= 0 && px < src.width && py >= 0 && py < src.height) {
+              let index = (px + py * src.width) * 4;
+              let gray = (src.pixels[index] + src.pixels[index + 1] + src.pixels[index + 2]) / 3;
+              sum += gray;
+              count++;
+            }
+          }
+        }
+        let index = (x + y * src.width) * 4;
+        let average = sum / count;
+        if (src.pixels[index] > average - C) {
+          adaptiveThresholdImg.pixels[index] = 200;
+          adaptiveThresholdImg.pixels[index + 1] = 200;
+          adaptiveThresholdImg.pixels[index + 2] = 200;
+        } else {
+          adaptiveThresholdImg.pixels[index] = 0;
+          adaptiveThresholdImg.pixels[index + 1] = 0;
+          adaptiveThresholdImg.pixels[index + 2] = 0;
+        }
+        adaptiveThresholdImg.pixels[index + 3] = 255;
+      }
+    }
+
+    // THRES_OTSU 적용
+    let totalPixels = src.width * src.height;
+    let histogram = new Array(256).fill(0);
+
+    // 히스토그램 생성
+    for (let i = 0; i < src.pixels.length; i += 4) {
+      let gray = (src.pixels[i] + src.pixels[i + 1] + src.pixels[i + 2]) / 3;
+      histogram[Math.floor(gray)]++;
+    }
+
+    // Thresholding 값 계산
+    let sum = 0;
+    for (let i = 0; i < 256; i++) {
+      sum += i * histogram[i];
+    }
+    let sumB = 0;
+    let wB = 0;
+    let wF = 0;
+    let mB;
+    let mF;
+    let maxVar = 0;
+    let threshold = 0;
+
+    for (let i = 0; i < 256; i++) {
+      wB += histogram[i];
+      if (wB === 0) continue;
+      wF = totalPixels - wB;
+      if (wF === 0) break;
+      sumB += i * histogram[i];
+      mB = sumB / wB;
+      mF = (sum - sumB) / wF;
+      let varBetween = wB * wF * (mB - mF) * (mB - mF);
+      if (varBetween > maxVar) {
+        maxVar = varBetween;
+        threshold = i;
+      }
+    }
+
+    // 이미지 이진화
+    for (let i = 0; i < src.pixels.length; i += 4) {
+      let gray = (src.pixels[i] + src.pixels[i + 1] + src.pixels[i + 2]) / 3;
+      if (gray > threshold) {
+        otsuThresholdImg.pixels[i] = 200;
+        otsuThresholdImg.pixels[i + 1] = 200;
+        otsuThresholdImg.pixels[i + 2] = 200;
+      } else {
+        otsuThresholdImg.pixels[i] = 0;
+        otsuThresholdImg.pixels[i + 1] = 0;
+        otsuThresholdImg.pixels[i + 2] = 0;
+      }
+      otsuThresholdImg.pixels[i + 3] = 255;
+    }
+
+    simpleThresholdImg.updatePixels();
+    adaptiveThresholdImg.updatePixels();
+    otsuThresholdImg.updatePixels();
+    
+    textSize(25);
+    text('original',10,40);
+    text('Simple Thresholding',src.width,40);
+    text('Adaptive Thresholding',10,src.height+90);
+    text('THRES_OTSU',adaptiveThresholdImg.width+10,src.height+90);
+    
+    image(src, 0, 50); //원본 이미지 표시
+    image(simpleThresholdImg, src.width+10, 50); // Simple Thresholding 이미지 표시
+    image(adaptiveThresholdImg, 0, src.height+100); // Adaptive Thresholding 이미지 표시
+    image(otsuThresholdImg, adaptiveThresholdImg.width+10, src.height+100); // THRES_OTSU 이미지 표시
+    
+  });
+}
